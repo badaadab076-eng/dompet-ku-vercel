@@ -1,0 +1,5 @@
+flask-cors==4.0.1
+requests==2.32.3
+bcrypt==4.2.0
+PyJWT==2.9.0
+python-dotenv==1.0.1
