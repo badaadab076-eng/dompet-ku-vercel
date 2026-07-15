@@ -438,3 +438,24 @@ def telegram_webhook():
 # Vercel hanya melayani web dashboard dan API — bukan bot Telegram.
 # Untuk setup webhook Telegram, gunakan Railway atau laptop+ngrok.
 
+# ── Setup webhook bot baru (token berbeda dari Railway) ───────────────────────
+def _setup_new_bot_webhook():
+    token   = os.environ.get("TELEGRAM_TOKEN","")
+    secret  = os.environ.get("TELEGRAM_WEBHOOK_SECRET","")
+    pub_url = os.environ.get("PUBLIC_URL","") or os.environ.get("VERCEL_URL","")
+    if not token or not pub_url: return
+    if not pub_url.startswith("http"): pub_url = "https://" + pub_url
+    try:
+        sys.path.insert(0, os.path.join(_root,"bot"))
+        import bot as tg_bot
+        webhook_url = pub_url.rstrip("/") + "/api/telegram/webhook"
+        payload = {"url": webhook_url}
+        if secret: payload["secret_token"] = secret
+        tg_bot.tg("setWebhook", **payload)
+        tg_bot.setup_commands()
+        print(f"[Bot-Vercel] Webhook aktif: {webhook_url}")
+    except Exception as e:
+        print(f"[Bot-Vercel] Gagal setup webhook: {e}")
+
+_setup_new_bot_webhook()
+
