@@ -422,16 +422,28 @@ def telegram_webhook():
         got = request.headers.get("X-Telegram-Bot-Api-Secret-Token","")
         if got != WEBHOOK_SECRET:
             return jsonify({"error":"forbidden"}), 403
+
     update = request.get_json(silent=True) or {}
-    try:
-        bot_dir = os.path.join(_root, "bot")
-        sys.path.insert(0, bot_dir)
-        import bot as tg_bot
-        if "message" in update:      tg_bot.handle_message(update["message"])
-        elif "callback_query" in update: tg_bot.handle_callback(update["callback_query"])
-    except Exception as e:
-        print(f"[Webhook] error: {e}")
-    return jsonify({"ok":True})
+
+    # Proses di thread terpisah agar Telegram dapat 200 OK secepat mungkin
+    import threading
+    def process():
+        try:
+            bot_dir = os.path.join(_root, "bot")
+            sys.path.insert(0, bot_dir)
+            import bot as tg_bot
+            if "message" in update:
+                tg_bot.handle_message(update["message"])
+            elif "callback_query" in update:
+                tg_bot.handle_callback(update["callback_query"])
+        except Exception as e:
+            print(f"[Webhook] error: {e}")
+
+    t = threading.Thread(target=process, daemon=True)
+    t.start()
+
+    # Return 200 segera — Telegram tidak perlu tunggu proses selesai
+    return jsonify({"ok": True})
 
 # ── Webhook Telegram TIDAK di-setup dari Vercel ──────────────────────────────
 # Bot Telegram dijalankan dari Railway/laptop yang punya persistent state.

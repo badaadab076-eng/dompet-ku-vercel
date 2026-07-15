@@ -1,8 +1,10 @@
 """
 Dompet-KU — Telegram Bot (Vercel Edition)
 State disimpan di Supabase agar bisa jalan di serverless (stateless).
+Optimasi: lazy import, minimal top-level code.
 """
-import requests, logging, json, re, calendar, os, sys, base64
+# Import minimal di top-level untuk percepat cold start
+import os, sys, re, json, logging, base64
 from datetime import datetime
 
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
@@ -10,10 +12,27 @@ logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logg
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _root)
 
-try:
-    from lib.supabase import sb_get, sb_post, sb_patch, sb_delete, SUPABASE_URL, SB_HEADERS
-except ImportError:
-    print("[Bot] lib.supabase tidak ditemukan")
+# Lazy import — hanya load saat pertama dipakai
+_requests = None
+_sb_get   = None
+_sb_post  = None
+_sb_patch = None
+_sb_delete= None
+_SB_URL   = None
+_SB_HDR   = None
+
+def _get_requests():
+    global _requests
+    if _requests is None:
+        import requests as _r; _requests = _r
+    return _requests
+
+def _init_supabase():
+    global _sb_get, _sb_post, _sb_patch, _sb_delete, _SB_URL, _SB_HDR
+    if _sb_get is None:
+        from lib.supabase import sb_get, sb_post, sb_patch, sb_delete, SUPABASE_URL, SB_HEADERS
+        _sb_get=sb_get; _sb_post=sb_post; _sb_patch=sb_patch; _sb_delete=sb_delete
+        _SB_URL=SUPABASE_URL; _SB_HDR=SB_HEADERS
 
 BOT_TOKEN  = os.environ.get("TELEGRAM_TOKEN", "")
 GROQ_KEY   = os.environ.get("GEMINI_API_KEY", "")
@@ -25,52 +44,52 @@ BASE       = f"https://api.telegram.org/bot{BOT_TOKEN}"
 # ── State di Supabase (bukan memory) ─────────────────────────────────────────
 
 def state_get(chat_id):
-    """Ambil state bot dari Supabase."""
+    _init_supabase()
     try:
-        rows = sb_get("bot_sessions", [("select","state"), ("chat_id",f"eq.{chat_id}"), ("limit","1")])
+        rows = _sb_get("bot_sessions", [("select","state"), ("chat_id",f"eq.{chat_id}"), ("limit","1")])
         return rows[0]["state"] if rows else {}
     except: return {}
 
 def state_set(chat_id, value):
-    """Simpan state bot ke Supabase (upsert)."""
+    _init_supabase()
     try:
-        import requests as _r
-        url = f"{SUPABASE_URL}/rest/v1/bot_sessions"
-        headers = {**SB_HEADERS, "Prefer": "resolution=merge-duplicates,return=representation"}
-        _r.post(url, headers=headers, json={"chat_id": int(chat_id), "state": value,
-                "updated_at": datetime.utcnow().isoformat()}, timeout=5)
+        req = _get_requests()
+        url = f"{_SB_URL}/rest/v1/bot_sessions"
+        headers = {**_SB_HDR, "Prefer": "resolution=merge-duplicates,return=representation"}
+        req.post(url, headers=headers, json={"chat_id": int(chat_id), "state": value,
+                 "updated_at": datetime.utcnow().isoformat()}, timeout=5)
     except Exception as e:
         logging.warning(f"state_set error: {e}")
 
 def state_pop(chat_id):
-    """Hapus state bot dari Supabase."""
-    try: sb_delete("bot_sessions", {"chat_id": f"eq.{chat_id}"})
+    _init_supabase()
+    try: _sb_delete("bot_sessions", {"chat_id": f"eq.{chat_id}"})
     except: pass
 
 # ── Linked users di Supabase ──────────────────────────────────────────────────
 
 def _get_linked(tg_id):
-    """Ambil data user yang sudah login dari Supabase."""
+    _init_supabase()
     try:
-        rows = sb_get("bot_linked", [("select","*"), ("telegram_id",f"eq.{str(tg_id)}"), ("limit","1")])
+        rows = _sb_get("bot_linked", [("select","*"), ("telegram_id",f"eq.{str(tg_id)}"), ("limit","1")])
         return rows[0] if rows else None
     except: return None
 
 def _set_linked(tg_id, data):
-    """Simpan data user login ke Supabase (upsert)."""
+    _init_supabase()
     try:
-        import requests as _r
-        url = f"{SUPABASE_URL}/rest/v1/bot_linked"
-        headers = {**SB_HEADERS, "Prefer": "resolution=merge-duplicates,return=representation"}
+        req = _get_requests()
+        url = f"{_SB_URL}/rest/v1/bot_linked"
+        headers = {**_SB_HDR, "Prefer": "resolution=merge-duplicates,return=representation"}
         payload = {"telegram_id": str(tg_id), "updated_at": datetime.utcnow().isoformat()}
         payload.update(data)
-        _r.post(url, headers=headers, json=payload, timeout=5)
+        req.post(url, headers=headers, json=payload, timeout=5)
     except Exception as e:
         logging.warning(f"_set_linked error: {e}")
 
 def _unlink(tg_id):
-    """Hapus data login user dari Supabase."""
-    try: sb_delete("bot_linked", {"telegram_id": f"eq.{str(tg_id)}"})
+    _init_supabase()
+    try: _sb_delete("bot_linked", {"telegram_id": f"eq.{str(tg_id)}"})
     except: pass
 
 
@@ -78,7 +97,7 @@ def _unlink(tg_id):
 
 def tg(method, **kwargs):
     try:
-        r = requests.post(f"{BASE}/{method}", json=kwargs, timeout=35)
+        r = _get_requests().post(f"{BASE}/{method}", json=kwargs, timeout=35)
         return r.json()
     except Exception as e:
         logging.error(f"TG [{method}]: {e}")
@@ -98,19 +117,20 @@ def fmt_rp(n):
 def kb_back_main():
     return {"inline_keyboard": [[{"text": "🏠 Menu Utama", "callback_data": "menu_utama"}]]}
 
-# ── API helpers — pakai session cookie dari linked user ───────────────────────
+# ── API helpers ───────────────────────────────────────────────────────────────
 
 def _api(method, path, tg_id, data=None, params=None):
     u = _get_linked(tg_id)
     if not u: return None
     cookies = {"dompetku_session": u["session_token"]}
+    req = _get_requests()
     try:
         if method == "GET":
-            r = requests.get(f"{API_URL}{path}", params=params, cookies=cookies, timeout=10)
+            r = req.get(f"{API_URL}{path}", params=params, cookies=cookies, timeout=10)
         elif method == "POST":
-            r = requests.post(f"{API_URL}{path}", json=data, cookies=cookies, timeout=10)
+            r = req.post(f"{API_URL}{path}", json=data, cookies=cookies, timeout=10)
         elif method == "DELETE":
-            r = requests.delete(f"{API_URL}{path}", cookies=cookies, timeout=10)
+            r = req.delete(f"{API_URL}{path}", cookies=cookies, timeout=10)
         else:
             return None
         return r.json() if r.ok and r.content else ({"ok": True} if r.ok else None)
@@ -122,9 +142,10 @@ def _api(method, path, tg_id, data=None, params=None):
 # ── Login ─────────────────────────────────────────────────────────────────────
 
 def do_link_account(chat_id, tg_id, username, password):
+    req = _get_requests()
     try:
-        r = requests.post(f"{API_URL}/auth/login",
-                          json={"username": username, "password": password}, timeout=10)
+        r = req.post(f"{API_URL}/auth/login",
+                     json={"username": username, "password": password}, timeout=10)
         if not r.ok:
             err = r.json().get("error", "Login gagal")
             send(chat_id, f"❌ *Gagal:* {err}\n\nKetik /login untuk coba lagi.")
@@ -143,7 +164,7 @@ def do_link_account(chat_id, tg_id, username, password):
             "session_token": cookie,
         })
         try:
-            requests.post(f"{API_URL}/auth/link-telegram",
+            _get_requests().post(f"{API_URL}/auth/link-telegram",
                           json={"username": username, "password": password,
                                 "telegram_id": str(tg_id)}, timeout=10)
         except: pass
@@ -423,16 +444,17 @@ def handle_photo(msg):
     label= "Pengeluaran 💸" if tipe=="exp" else "Pemasukan 💰"
     if not GROQ_KEY: send(chat_id, "⚠️ Groq API Key belum diset."); return
     send(chat_id, f"📷 *Foto diterima! ({label})*\n⏳ Sedang membaca dengan AI...\nMohon tunggu sebentar")
+    req = _get_requests()
     try:
         photos  = msg.get("photo",[])
         if not photos: send(chat_id, "❌ Tidak ada foto."); return
         fi = tg("getFile", file_id=photos[-1]["file_id"])
         fp = fi.get("result",{}).get("file_path")
         if not fp: send(chat_id, "❌ Gagal ambil foto."); return
-        img  = requests.get(f"https://api.telegram.org/file/bot{BOT_TOKEN}/{fp}", timeout=30)
+        img  = req.get(f"https://api.telegram.org/file/bot{BOT_TOKEN}/{fp}", timeout=30)
         if not img.ok: send(chat_id, "❌ Gagal download foto."); return
         b64  = base64.b64encode(img.content).decode()
-        resp = requests.post("https://api.groq.com/openai/v1/chat/completions",
+        resp = req.post("https://api.groq.com/openai/v1/chat/completions",
             json={"model":"meta-llama/llama-4-scout-17b-16e-instruct","max_tokens":600,
                   "messages":[{"role":"user","content":[
                       {"type":"text","text":'Baca struk/nota ini. Jawab HANYA JSON:\n{"desc":"deskripsi","amount":12000,"date":"2024-01-15","source_name":"nama toko"}\nJika bukan struk: {"error":"bukan struk"}'},
@@ -626,7 +648,7 @@ def handle_callback(cb):
     if data.startswith("hapus_"):
         tx_id = data.split("_")[1]
         try:
-            r = requests.delete(f"{API_URL}/transactions/{tx_id}",
+            r = _get_requests().delete(f"{API_URL}/transactions/{tx_id}",
                 cookies={"dompetku_session":u["session_token"]}, timeout=10)
             if r.ok: send(chat_id,"✅ Transaksi berhasil dihapus.", keyboard=kb_back_main())
             else: send(chat_id,"❌ Gagal menghapus.", keyboard=kb_back_main())
