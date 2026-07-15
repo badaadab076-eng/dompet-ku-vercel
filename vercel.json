@@ -1,26 +1,18 @@
 {
   "version": 2,
-  "rewrites": [
-    { "source": "/api/auth/login",               "destination": "/api/auth/login" },
-    { "source": "/api/auth/register",            "destination": "/api/auth/register" },
-    { "source": "/api/auth/logout",              "destination": "/api/auth/logout" },
-    { "source": "/api/auth/me",                  "destination": "/api/auth/me" },
-    { "source": "/api/auth/members",             "destination": "/api/auth/members" },
-    { "source": "/api/auth/change-password",     "destination": "/api/auth/change-password" },
-    { "source": "/api/auth/invite",              "destination": "/api/auth/invite" },
-    { "source": "/api/auth/join",                "destination": "/api/auth/join" },
-    { "source": "/api/transactions/:id",         "destination": "/api/transactions/[id]" },
-    { "source": "/api/transactions",             "destination": "/api/transactions/index" },
-    { "source": "/api/categories/:name",         "destination": "/api/categories/[name]" },
-    { "source": "/api/categories",              "destination": "/api/categories/index" },
-    { "source": "/api/summary/member",           "destination": "/api/summary/member" },
-    { "source": "/api/summary",                  "destination": "/api/summary/index" },
-    { "source": "/api/private/transactions/:id", "destination": "/api/private/transactions/[id]" },
-    { "source": "/api/private/transactions",     "destination": "/api/private/transactions" },
-    { "source": "/api/private/summary",          "destination": "/api/private/summary" },
-    { "source": "/api/telegram/webhook",         "destination": "/api/telegram/webhook" },
-    { "source": "/api/settings",                 "destination": "/api/settings/index" },
-    { "source": "/api/admins",                   "destination": "/api/admins/index" },
-    { "source": "/(.*)",                         "destination": "/public/index.html" }
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.py" },
+    { "src": "/join",     "dest": "/api/index.py" },
+    { "src": "/(.*)",     "dest": "/public/index.html" }
   ]
 }
