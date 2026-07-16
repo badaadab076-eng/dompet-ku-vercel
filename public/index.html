@@ -3198,14 +3198,23 @@ function checkVaultAdmin(){
   // Vault untuk SEMUA user yang sudah login — bukan hanya admin
   _isAdmin = (_sessionUser && _sessionUser.role === 'admin') || allAdmins.includes(currentUser);
   const btn = document.getElementById("btnVault");
-  // Tampilkan tombol vault jika: sudah login via session ATAU sudah pilih identitas (v4/lokal)
-  if(_sessionUser || (_isAdmin && currentUser)){
+  // Tampilkan tombol vault:
+  // - Di sistem session (Vercel/Railway): cek _sessionUser
+  // - Di sistem lokal (v4): cek _isAdmin && currentUser
+  // - Kalau _sessionUser null tapi belum ada currentUser valid → tunggu, jangan hide
+  const hasSession = !!_sessionUser;
+  const hasLocalAdmin = !hasSession && _isAdmin && currentUser;
+  const sessionLoading = !hasSession && !currentUser; // masih loading, jangan hide dulu
+
+  if(hasSession || hasLocalAdmin){
     btn.classList.add("visible");
-  } else {
+  } else if(!sessionLoading) {
+    // Hanya hide kalau kita yakin user sudah loaded tapi bukan admin
     btn.classList.remove("visible");
     btn.classList.remove("vault-active");
     document.getElementById("vaultOverlay").classList.remove("vault-open");
   }
+  // Kalau sessionLoading = true, biarkan state button seperti sebelumnya
 }
 
 // ── PIN VAULT ─────────────────────────────────────────────────────────────────
