@@ -3198,8 +3198,8 @@ function checkVaultAdmin(){
   // Vault untuk SEMUA user yang sudah login — bukan hanya admin
   _isAdmin = (_sessionUser && _sessionUser.role === 'admin') || allAdmins.includes(currentUser);
   const btn = document.getElementById("btnVault");
-  // Tampilkan tombol vault untuk semua user yang sudah login
-  if(_sessionUser){
+  // Tampilkan tombol vault jika: sudah login via session ATAU sudah pilih identitas (v4/lokal)
+  if(_sessionUser || (_isAdmin && currentUser)){
     btn.classList.add("visible");
   } else {
     btn.classList.remove("visible");
