@@ -12,10 +12,25 @@
       "dest": "/public/sw.js",
       "headers": {
         "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Service-Worker-Allowed": "/"
+        "Service-Worker-Allowed": "/",
+        "Content-Type": "application/javascript"
       }
     },
-    { "src": "/manifest.json", "dest": "/public/manifest.json" },
+    {
+      "src": "/manifest.json",
+      "dest": "/public/manifest.json",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Content-Type": "application/manifest+json"
+      }
+    },
+    {
+      "src": "/static/icons/(.*)",
+      "dest": "/public/static/icons/$1",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
+    },
     { "src": "/static/(.*)",   "dest": "/public/static/$1" },
     { "src": "/(.*)",          "dest": "/public/index.html" }
   ]

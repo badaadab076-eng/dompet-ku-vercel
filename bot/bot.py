@@ -46,7 +46,13 @@ BASE       = f"https://api.telegram.org/bot{BOT_TOKEN}"
 def state_get(chat_id):
     _init_supabase()
     try:
-        rows = _sb_get("bot_sessions", [("select","state"), ("chat_id",f"eq.{chat_id}"), ("limit","1")])
+        # Order by updated_at desc agar selalu ambil state terbaru
+        rows = _sb_get("bot_sessions", [
+            ("select","state"),
+            ("chat_id",f"eq.{chat_id}"),
+            ("order","updated_at.desc"),
+            ("limit","1")
+        ])
         return rows[0]["state"] if rows else {}
     except: return {}
 
@@ -54,7 +60,8 @@ def state_set(chat_id, value):
     _init_supabase()
     try:
         req = _get_requests()
-        url = f"{_SB_URL}/rest/v1/bot_sessions"
+        # Tambahkan ?on_conflict=chat_id agar PostgREST tahu kolom untuk upsert
+        url = f"{_SB_URL}/rest/v1/bot_sessions?on_conflict=chat_id"
         headers = {**_SB_HDR, "Prefer": "resolution=merge-duplicates,return=representation"}
         r = req.post(url, headers=headers, json={"chat_id": int(chat_id), "state": value,
                  "updated_at": datetime.utcnow().isoformat()}, timeout=5)
@@ -73,7 +80,13 @@ def state_pop(chat_id):
 def _get_linked(tg_id):
     _init_supabase()
     try:
-        rows = _sb_get("bot_linked", [("select","*"), ("telegram_id",f"eq.{str(tg_id)}"), ("limit","1")])
+        # Order by updated_at desc agar selalu ambil data login terbaru
+        rows = _sb_get("bot_linked", [
+            ("select","*"),
+            ("telegram_id",f"eq.{str(tg_id)}"),
+            ("order","updated_at.desc"),
+            ("limit","1")
+        ])
         return rows[0] if rows else None
     except: return None
 
@@ -81,11 +94,14 @@ def _set_linked(tg_id, data):
     _init_supabase()
     try:
         req = _get_requests()
-        url = f"{_SB_URL}/rest/v1/bot_linked"
+        # on_conflict=telegram_id agar tidak duplikat
+        url = f"{_SB_URL}/rest/v1/bot_linked?on_conflict=telegram_id"
         headers = {**_SB_HDR, "Prefer": "resolution=merge-duplicates,return=representation"}
         payload = {"telegram_id": str(tg_id), "updated_at": datetime.utcnow().isoformat()}
         payload.update(data)
-        req.post(url, headers=headers, json=payload, timeout=5)
+        r = req.post(url, headers=headers, json=payload, timeout=5)
+        if not r.ok:
+            logging.error(f"_set_linked FAILED: {r.status_code} {r.text[:100]}")
     except Exception as e:
         logging.warning(f"_set_linked error: {e}")
 

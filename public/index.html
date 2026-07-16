@@ -3708,6 +3708,10 @@ document.addEventListener("DOMContentLoaded", function(){
   if(vm) vm.addEventListener("click", function(e){
     if(e.target === this) closeVaultModal();
   });
+  // ── Panggil checkAuthSession saat DOM siap ──
+  // Ini me-restore _sessionUser dari cookie setelah refresh,
+  // sehingga vault button & role admin tidak hilang.
+  checkAuthSession();
 });
 
 </script>
