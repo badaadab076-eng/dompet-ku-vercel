@@ -657,7 +657,13 @@ def handle_callback(cb):
         send(chat_id,"❓ *Panduan*\n• /menu /saldo /laporan /riwayat\n• /vault /logout /id\n📷 Kirim foto struk!",
              keyboard=kb_back_main()); return
     if data in ("simpan_exp","simpan_inc"):
-        if s.get("step") in ("konfirmasi_tx","scan_konfirmasi"): do_simpan_tx(chat_id, tg_id, s)
+        # Debug log untuk diagnosa scan tidak tersimpan
+        logging.info(f"[simpan] data={data} step={s.get('step')} amount={s.get('amount')} desc={s.get('desc')} tipe={s.get('tipe')}")
+        if s.get("step") in ("konfirmasi_tx","scan_konfirmasi"):
+            do_simpan_tx(chat_id, tg_id, s)
+        else:
+            logging.error(f"[simpan] Step tidak cocok: {s.get('step')} — state penuh: {s}")
+            send(chat_id, f"❌ State tidak valid (step={s.get('step')}). Coba scan ulang.", keyboard=kb_back_main())
         return
     if data in ("ubah_exp","ubah_inc"):
         tipe = data.split("_")[1]
