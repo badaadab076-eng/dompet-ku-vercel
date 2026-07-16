@@ -1952,8 +1952,8 @@ function applyCurrentUser(){
   // Tambah/hapus class is-admin di body (kontrol CSS admin-only)
   if(currentRole==="admin") document.body.classList.add("is-admin");
   else document.body.classList.remove("is-admin");
-  // Update tombol vault
-  checkVaultAdmin();
+  // Update tombol vault — hanya jika sudah ada session dari server
+  if(_sessionUser) checkVaultAdmin();
 }
 
 function renderAdminList(){

@@ -56,10 +56,12 @@ def state_set(chat_id, value):
         req = _get_requests()
         url = f"{_SB_URL}/rest/v1/bot_sessions"
         headers = {**_SB_HDR, "Prefer": "resolution=merge-duplicates,return=representation"}
-        req.post(url, headers=headers, json={"chat_id": int(chat_id), "state": value,
+        r = req.post(url, headers=headers, json={"chat_id": int(chat_id), "state": value,
                  "updated_at": datetime.utcnow().isoformat()}, timeout=5)
+        if not r.ok:
+            logging.error(f"state_set FAILED: {r.status_code} {r.text[:100]}")
     except Exception as e:
-        logging.warning(f"state_set error: {e}")
+        logging.error(f"state_set error (state mungkin hilang): {e}")
 
 def state_pop(chat_id):
     _init_supabase()
@@ -475,7 +477,7 @@ def handle_photo(msg):
         src_n  = data.get("source_name","")
         cat    = smart_category(desc, tipe)
         if amount<=0: send(chat_id, "⚠️ Nominal tidak terdeteksi.", keyboard=kb_back_main()); return
-        state_set(chat_id, {"step":"scan_konfirmasi","tipe":tipe,"desc":desc,"amount":amount,"date":date_s,"category":cat})
+        state_set(chat_id, {**s, "step":"scan_konfirmasi","tipe":tipe,"desc":desc,"amount":amount,"date":date_s,"category":cat})
         icon  = "💸" if tipe=="exp" else "💰"
         label = "Pengeluaran" if tipe=="exp" else "Pemasukan"
         note  = f"\n_{src_n}_" if src_n else ""
