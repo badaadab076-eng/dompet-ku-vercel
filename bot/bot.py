@@ -406,18 +406,30 @@ def do_simpan_tx(chat_id, tg_id, s):
     u = _get_linked(tg_id)
     if not u:
         send(chat_id, "❌ Sesi habis. Ketik /login."); return
-    tipe=s.get("tipe","exp"); amount=s.get("amount"); desc=s.get("desc"); cat=s.get("category","Lainnya")
+    tipe=s.get("tipe","exp"); amount=s.get("amount"); desc=s.get("desc")
+    cat=s.get("category","Lainnya"); ikey=s.get("idempotency_key")
+    logging.info(f"[do_simpan_tx] step={s.get('step')} tipe={tipe} amount={amount} ikey={ikey}")
     if not amount or not desc:
-        send(chat_id, "❌ Data tidak lengkap. Coba lagi.", keyboard=kb_back_main()); return
-    r = _api("POST", "/transactions", tg_id, {
+        send(chat_id, f"❌ Data tidak lengkap. Coba scan ulang.", keyboard=kb_back_main()); return
+    payload = {
         "type":tipe,"amount":amount,"desc":desc,"category":cat,
-        "member":u["display_name"],"date":s.get("date",datetime.now().strftime("%Y-%m-%d")),"source":"telegram"})
+        "member":u["display_name"],"date":s.get("date",datetime.now().strftime("%Y-%m-%d")),
+        "source":"telegram"
+    }
+    if ikey:
+        payload["idempotency_key"] = ikey
+    r = _api("POST", "/transactions", tg_id, payload)
     state_pop(chat_id)
     if r and r.get("id"):
         send(chat_id, f"✅ *Tersimpan!*\n\n{'❤️' if tipe=='exp' else '💚'} *{fmt_rp(amount)}*\n📝 {desc}\n🏷 {cat}",
              keyboard={"inline_keyboard":[[{"text":"➕ Catat Lagi","callback_data":"menu_transaksi"},
                                            {"text":"🏠 Menu","callback_data":"menu_utama"}]]})
+    elif r and ("duplicate" in str(r).lower() or "unique" in str(r).lower()):
+        # Transaksi sudah tersimpan sebelumnya (double-click atau retry)
+        send(chat_id, "✅ *Transaksi sudah tersimpan sebelumnya.*\n_(duplikat diabaikan)_",
+             keyboard={"inline_keyboard":[[{"text":"🏠 Menu","callback_data":"menu_utama"}]]})
     else:
+        logging.error(f"[do_simpan_tx] API response gagal: {r}")
         send(chat_id, "❌ Gagal menyimpan. Coba lagi.", keyboard=kb_back_main())
 
 def do_simpan_vault(chat_id, tg_id, s):
@@ -493,7 +505,8 @@ def handle_photo(msg):
         src_n  = data.get("source_name","")
         cat    = smart_category(desc, tipe)
         if amount<=0: send(chat_id, "⚠️ Nominal tidak terdeteksi.", keyboard=kb_back_main()); return
-        state_set(chat_id, {**s, "step":"scan_konfirmasi","tipe":tipe,"desc":desc,"amount":amount,"date":date_s,"category":cat})
+        state_set(chat_id, {**s, "step":"scan_konfirmasi","tipe":tipe,"desc":desc,"amount":amount,"date":date_s,"category":cat,
+                            "idempotency_key": f"scan_{chat_id}_{int(datetime.now().timestamp())}"})
         icon  = "💸" if tipe=="exp" else "💰"
         label = "Pengeluaran" if tipe=="exp" else "Pemasukan"
         note  = f"\n_{src_n}_" if src_n else ""
