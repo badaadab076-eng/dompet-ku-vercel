@@ -11,8 +11,11 @@
     }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index.py" },
-    { "src": "/join",     "dest": "/api/index.py" },
-    { "src": "/(.*)",     "dest": "/public/index.html" }
+    { "src": "/api/(.*)",        "dest": "/api/index.py" },
+    { "src": "/join",            "dest": "/api/index.py" },
+    { "src": "/sw.js",           "dest": "/public/sw.js" },
+    { "src": "/manifest.json",   "dest": "/public/manifest.json" },
+    { "src": "/static/(.*)",     "dest": "/public/static/$1" },
+    { "src": "/(.*)",            "dest": "/public/index.html" }
   ]
 }
