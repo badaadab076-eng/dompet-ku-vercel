@@ -3169,9 +3169,8 @@ async function init(){
     if(i===0){o.selected=true;curMonth=val;}
     sel.appendChild(o);
   }
-  await loadSettings();
-  await loadAll();
-  // Who modal tidak dipanggil lagi — identitas dari session login
+  // JANGAN load data dulu — tunggu checkAuthSession selesai.
+  // Data akan dimuat oleh _enterDashboard() setelah session valid.
 }
 init();
 
@@ -4302,8 +4301,14 @@ function _enterDashboard(user){
   // Apply visibility mode
   if(typeof applyVisibilityMode==='function') applyVisibilityMode();
 
-  // Muat data dashboard
-  if(typeof loadAll==='function') loadAll(true);
+  // Muat settings (anggota, nama keluarga) lalu data dashboard
+  if(typeof loadSettings==='function'){
+    loadSettings().then(()=>{
+      if(typeof loadAll==='function') loadAll(true);
+    });
+  } else if(typeof loadAll==='function') {
+    loadAll(true);
+  }
 }
 
 async function doLogout(){

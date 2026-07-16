@@ -391,8 +391,9 @@ def do_simpan_tx(chat_id, tg_id, s):
     if not u:
         send(chat_id, "❌ Sesi habis. Ketik /login."); return
     tipe=s.get("tipe","exp"); amount=s.get("amount"); desc=s.get("desc"); cat=s.get("category","Lainnya")
+    logging.info(f"[do_simpan_tx] step={s.get('step')} tipe={tipe} amount={amount} desc={desc}")
     if not amount or not desc:
-        send(chat_id, "❌ Data tidak lengkap. Coba lagi.", keyboard=kb_back_main()); return
+        send(chat_id, f"❌ Data tidak lengkap (amount={amount}, desc={desc}). Coba scan ulang.", keyboard=kb_back_main()); return
     r = _api("POST", "/transactions", tg_id, {
         "type":tipe,"amount":amount,"desc":desc,"category":cat,
         "member":u["display_name"],"date":s.get("date",datetime.now().strftime("%Y-%m-%d")),"source":"telegram"})
