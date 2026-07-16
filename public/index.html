@@ -4277,6 +4277,9 @@ function _enterDashboard(user){
   const authPage=document.getElementById('authPage');
   if(authPage) authPage.style.display='none';
 
+  // Set _sessionUser PERTAMA — dibutuhkan oleh checkVaultAdmin
+  _sessionUser = user;
+
   // Set identitas dari server
   currentUser = user.display_name;
   currentRole = user.role;
